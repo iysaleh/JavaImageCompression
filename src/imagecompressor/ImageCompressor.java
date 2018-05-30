@@ -17,7 +17,9 @@ import java.io.File;
 import argparser.ArgParser;
 import argparser.StringHolder;
 import argparser.BooleanHolder;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -74,55 +76,8 @@ public class ImageCompressor {
     {
         //BitSet valBits = BitSet.valueOf()
     }
-    
-    public static void runLengthGrayEncodeBitset(String inputPath, String outputPath) throws Exception
-    {
-        BufferedImage srcImg = loadGrayscaleImage(new File(inputPath));
-        WritableRaster wrSrc = srcImg.getRaster();
-        
-        
-        
-        BitSet encodedBits = new BitSet();
-        //First 24bits encode width of image
-        //Second 24bits encode height of image
-        //This algorihtm always starts with 0 for RL encoding.
-        for(int i=0;i<wrSrc.getWidth();i++){
-            for(int j=0;j<wrSrc.getHeight();j++){
-                //TODO
-            }
-        }
-        
-        //Write encodedBits byte[] to file.
-        Files.write(Paths.get(outputPath), encodedBits.toByteArray(),StandardOpenOption.CREATE_NEW);
-    }
+ 
     public static void runLengthGrayEncode(String inputPath, String outputPath) throws Exception
-    {
-        BufferedImage srcImg = loadGrayscaleImage(new File(inputPath));
-        WritableRaster wrSrc = srcImg.getRaster();
-
-        
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
-        
-        //TODO: Add image height and width to bytes encoded
-        
-        for(int i=0;i<wrSrc.getWidth();i++){
-            for(int j=0;j<wrSrc.getHeight();j++){
-                bytes.write(wrSrc.getSample(i, j, 0)); //Add pixel to bytes array
-            }
-        }
-        BitSet bits = BitSet.valueOf(bytes.toByteArray());
-        
-        
-        System.out.println(bits.toString());
-        /*
-        for (int i = bits.nextSetBit(0); i != -1; i = bits.nextSetBit(i + 1)) {
-            indexes.add(i);
-        }*/
-
-        
-    }    
-    public static void runLengthGrayEncodeVerboseBitset(String inputPath, String outputPath) throws Exception
     {
         BufferedImage srcImg = loadGrayscaleImage(new File(inputPath));
         WritableRaster wrSrc = srcImg.getRaster();
@@ -141,11 +96,11 @@ public class ImageCompressor {
         
         for(int i=0;i<wrSrc.getWidth();i++){
             for(int j=0;j<wrSrc.getHeight();j++){
-                bits.addByte(wrSrc.getSample(i, j, 0));
+                bits.addByteSizedInt(wrSrc.getSample(i, j, 0));
             }
         }
         
-        System.out.println(bits.toString());
+        //System.out.println(bits.toString());
         StringBuilder encodedString = new StringBuilder();
         
         ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
@@ -173,8 +128,48 @@ public class ImageCompressor {
         //Write encodedBits byte[] to file.
         //Files.write(Paths.get(outputPath), encodedBits.toByteArray(),StandardOpenOption.CREATE_NEW);
     }
-    public static void runLengthGrayDecode(String inputPath, String outputPath) throws Exception
+    //encodedBitSize is the number of bits used to encode each runlength.
+    public static void runLengthGrayDecode(String inputPath, String outputPath,int encodedBitSize) throws Exception
     {
+        //Read the compressed bytes.
+        byte[] inputByteArray = Files.readAllBytes(Paths.get(inputPath));
+        VerboseBitSet compressedBits = new VerboseBitSet(inputByteArray);
+        VerboseBitSet uncompressedBits = new VerboseBitSet();
+        
+        //TODO: FIX Hardcoding dimensions since they are not in the encoded output yet.
+        BufferedImage dest = new BufferedImage(512,512,BufferedImage.TYPE_BYTE_GRAY);
+        WritableRaster wrDest = dest.getRaster();
+
+        int imWidth = wrDest.getWidth();
+        int imHeight = wrDest.getHeight();
+        
+        
+        char currentlyDecoding = '0';
+        int runLength = 0;
+        while(compressedBits.length() > 0){
+            runLength = compressedBits.popInt(encodedBitSize);
+            for(int i=0; i <runLength; i++)
+            {
+                if(currentlyDecoding=='0')
+                    uncompressedBits.addZero();
+                else
+                    uncompressedBits.addOne();
+            }
+            if(currentlyDecoding=='0')
+                currentlyDecoding='1';
+            else
+                currentlyDecoding='0';
+        }
+        
+        for(int i=0;i<wrDest.getWidth();i++){
+            for(int j=0;j<wrDest.getHeight();j++){
+                wrDest.setSample(i, j, 0, uncompressedBits.popInt(8));
+            }
+        }
+        dest.setData(wrDest);
+        ImageIO.write(dest, getExtension(outputPath), new File(outputPath));
+
+        
     }
     public static void runLengthBitPlaneEncode(String inputPath, String outputPath) throws Exception
     {
@@ -205,6 +200,7 @@ public class ImageCompressor {
         //DELETE ME BEFORE SUBMISSION!
         /////THIS IS JUST SO I DON'T NEED TO TYPE IN COMMAND LINE ARGUMENTS FROM NETBEANS
         args = new String[] {"-input","lena.gif","-output","lenaRLGCompressed.gif","-compressionType","runLengthGray"};
+        args = new String[] {"-input","lenaRLGCompressed.gif","-output","lenaRLGUncompressed.gif","-compressionType","runLengthGray", "-decode"};
 
         //Create argument parser for command line arguments
         ArgParser parser = new ArgParser("Java ImageCompressor CLI Application");
@@ -213,7 +209,6 @@ public class ImageCompressor {
         parser.addOption("-compressionType %s #Compression type to utilize for encoding/decoding (runLengthGray,runLengthBitPlane,huffman,lzw)", compressionType);
         parser.addOption("-decode %v #If specified, decode action will be performed. Otherwise the program will encode the source input.", decode);
         parser.matchAllArgs (args);
-        
         
         //Catch null required commandline arguments and exit program
         try{
@@ -233,10 +228,10 @@ public class ImageCompressor {
         switch(compressionType.value){
             case "runLengthGray":
                 if(decode.value)
-                    runLengthGrayDecode(input.value,output.value);
+                    runLengthGrayDecode(input.value,output.value,8);
                 else //Decode not set so Encode
-                    runLengthGrayEncodeVerboseBitset(input.value,output.value);
-                    //runLengthGrayEncode(input.value,output.value);
+                    //runLengthGrayEncodeVerboseBitset(input.value,output.value);
+                    runLengthGrayEncode(input.value,output.value);
             case "runLengthBitPlane":
                 if(decode.value)
                     runLengthBitPlaneDecode(input.value,output.value);
