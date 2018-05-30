@@ -15,17 +15,23 @@ package imagecompressor;
  */
 public class VerboseBitSet {
     StringBuilder bitString;
+    int counter;
     public VerboseBitSet()
     {
         this.bitString = new StringBuilder();
+        this.counter = 0;
     }
     public VerboseBitSet(byte[] bytes)
     {
         this.bitString = new StringBuilder();
+        System.out.println("NUM_BYTES_TO_DECODE: "+bytes.length); //DEBUG
         for(int i=0; i < bytes.length;i++){
             //https://stackoverflow.com/questions/12310017/how-to-convert-a-byte-to-its-binary-string-representation
             this.bitString.append(Integer.toBinaryString((bytes[i] & 0xFF) + 0x100).substring(1));
+            //System.out.println(Integer.toBinaryString((bytes[i] & 0xFF) + 0x100).substring(1));
         }
+        System.out.println("Encoded BitSet: "+this.bitString.toString());
+        this.counter = 0;
     }
     public void addByteSizedInt(int i)
     {
@@ -46,11 +52,14 @@ public class VerboseBitSet {
     public void addZero(){this.bitString.append('0');}
     public int popInt(int numBits)
     {
-        String subBits = this.bitString.substring(0,numBits);
-        this.bitString.delete(0, numBits);
+        //System.out.println("COUNTER:"+counter);
+        String subBits = this.bitString.substring(counter,counter+numBits);
+        this.counter += numBits;
+        //this.bitString.delete(0, numBits);
         return Integer.parseInt(subBits, 2);
     }
     public StringBuilder getBitString(){return this.bitString;}
     public String toString(){ return this.bitString.toString(); }
+    public int getCounter() { return this.counter; }
     public int length(){ return this.bitString.length(); }
 }

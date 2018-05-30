@@ -27,6 +27,7 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.StringTokenizer;
 
 
 /*
@@ -103,13 +104,13 @@ public class ImageCompressor {
         //System.out.println(bits.toString());
         StringBuilder encodedString = new StringBuilder();
         
-        ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
+        //ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
         String bitString = bits.toString();
         for(int i=0; i < bits.length(); i++){
             if(bitString.charAt(i)==currentlyEncoding && runLength <= 254)
                 runLength++;
             else{
-                bytesEncoded.write(runLength);
+                //bytesEncoded.write(runLength);
                 encodedString.append(runLength+",");
                 if(currentlyEncoding=='0')
                     currentlyEncoding='1';
@@ -118,10 +119,18 @@ public class ImageCompressor {
                 runLength=0;
             }
         }
-        //Write encoded bytes to file
-        bytesEncoded.writeTo(new FileOutputStream(outputPath));
-
+        System.out.println("BITS_IN_ENCODED_STRING: "+encodedString.length()); //debug
         
+        //Write encoded bytes to file
+        //bytesEncoded.writeTo(new FileOutputStream(outputPath));
+
+        ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
+        String[] runLengthTokens = encodedString.toString().split(",");
+        System.out.println(runLengthTokens.length); //DEBUG
+        for(String token: runLengthTokens){
+            bytesEncoded.write((byte)Integer.parseInt(token));
+        }
+        bytesEncoded.writeTo(new FileOutputStream(outputPath));
         //BitSet bits = BitSet.valueOf(imageBytes);
         //System.out.println(bits.toString());
        
@@ -146,7 +155,7 @@ public class ImageCompressor {
         
         char currentlyDecoding = '0';
         int runLength = 0;
-        while(compressedBits.length() > 0){
+        while(compressedBits.getCounter()+encodedBitSize < compressedBits.length()){
             runLength = compressedBits.popInt(encodedBitSize);
             for(int i=0; i <runLength; i++)
             {
@@ -160,7 +169,7 @@ public class ImageCompressor {
             else
                 currentlyDecoding='0';
         }
-        
+        System.out.println(uncompressedBits.getBitString().toString());//DEBUG
         for(int i=0;i<wrDest.getWidth();i++){
             for(int j=0;j<wrDest.getHeight();j++){
                 wrDest.setSample(i, j, 0, uncompressedBits.popInt(8));
