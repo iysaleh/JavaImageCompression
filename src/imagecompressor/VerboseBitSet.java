@@ -5,6 +5,8 @@
  */
 package imagecompressor;
 
+import java.io.ByteArrayOutputStream;
+
 /**
  *
  * @author Ibraheem Saleh
@@ -30,7 +32,7 @@ public class VerboseBitSet {
             this.bitString.append(Integer.toBinaryString((bytes[i] & 0xFF) + 0x100).substring(1));
             //System.out.println(Integer.toBinaryString((bytes[i] & 0xFF) + 0x100).substring(1));
         }
-        System.out.println("Encoded BitSet: "+this.bitString.toString());
+        //System.out.println("Encoded BitSet: "+this.bitString.toString());
         this.counter = 0;
     }
     public void addByteSizedInt(int i)
@@ -57,6 +59,14 @@ public class VerboseBitSet {
         this.counter += numBits;
         //this.bitString.delete(0, numBits);
         return Integer.parseInt(subBits, 2);
+    }
+    public ByteArrayOutputStream getByteArray()
+    {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        for(int i=0;i<this.bitString.length();i+=8){
+            bytes.write((byte)Integer.parseInt(this.bitString.substring(i,i+8),2));//Parse each byte from the bitstring
+        }
+        return bytes;
     }
     public StringBuilder getBitString(){return this.bitString;}
     public String toString(){ return this.bitString.toString(); }

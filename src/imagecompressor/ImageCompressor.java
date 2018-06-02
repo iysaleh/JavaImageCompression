@@ -51,6 +51,8 @@ public class ImageCompressor {
         WritableRaster wrSrc = src.getRaster();
         WritableRaster wrDestGray = destGray.getRaster();
 
+        System.out.println("FIRST 3 ENC IM VALS: "+ wrSrc.getSample(0, 0, 0) +"," +wrSrc.getSample(0, 1, 0) + ","+wrSrc.getSample(0, 2, 0));
+        
         //Copy each sample from the original image into the grayscale domain BufferedImage.
         for(int i=0;i<wrSrc.getWidth();i++){
             for(int j=0;j<wrSrc.getHeight();j++){
@@ -65,6 +67,13 @@ public class ImageCompressor {
     {
         String[] tokens = fileString.split("\\.(?=[^\\.]+$)");
         return tokens[1];
+    }
+    public static char swapCurrentlyEncoding(char encoding)
+    {
+        if(encoding=='1')
+            return '0';
+        else
+            return '1';
     }
     
     public static byte[] bufferedImageToByteArray(BufferedImage img,String srcFormat)throws Exception
@@ -103,23 +112,30 @@ public class ImageCompressor {
         
         //System.out.println(bits.toString());
         StringBuilder encodedString = new StringBuilder();
-        
+
+
+        System.out.println("UncompressedBitStringEncode: "+bits.getBitString().substring(0,64));//debug
+        System.out.println("UncompressedBitStringEncodeLength: "+bits.getBitString().length());//debug
+       
         //ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
-        String bitString = bits.toString();
+        String bitString = bits.toString();        
         for(int i=0; i < bits.length(); i++){
             if(bitString.charAt(i)==currentlyEncoding && runLength <= 254)
                 runLength++;
-            else{
+            else if(bitString.charAt(i)!=currentlyEncoding){
+                encodedString.append(runLength+",");
+                currentlyEncoding = swapCurrentlyEncoding(currentlyEncoding);
+                runLength=1;
+            }
+            else{ //runLength >= 254 but still encoding char!
                 //bytesEncoded.write(runLength);
                 encodedString.append(runLength+",");
-                if(currentlyEncoding=='0')
-                    currentlyEncoding='1';
-                else
-                    currentlyEncoding='0';
-                runLength=0;
+                encodedString.append("0,");
+                runLength=1;
             }
         }
         System.out.println("BITS_IN_ENCODED_STRING: "+encodedString.length()); //debug
+        System.out.println("RunLengthBitString: "+encodedString.substring(0,64));//debug
         
         //Write encoded bytes to file
         //bytesEncoded.writeTo(new FileOutputStream(outputPath));
@@ -127,10 +143,25 @@ public class ImageCompressor {
         ByteArrayOutputStream bytesEncoded = new ByteArrayOutputStream();
         String[] runLengthTokens = encodedString.toString().split(",");
         System.out.println(runLengthTokens.length); //DEBUG
+        
+        
+        VerboseBitSet compressedBitstring = new VerboseBitSet();
+        for(String token: runLengthTokens){
+            compressedBitstring.addInt(Integer.parseInt(token), 8);
+        }
+        System.out.println("Encoded Compressed Bitstring: "+ compressedBitstring.getBitString().substring(0, 64));
+        System.out.println("Encoded Compressed Bitstring Length: "+ compressedBitstring.getBitString().length());
+        
+        compressedBitstring.getByteArray().writeTo(new FileOutputStream(outputPath));
+        
+        /*//NO IDEA IF THIS WORKS
         for(String token: runLengthTokens){
             bytesEncoded.write((byte)Integer.parseInt(token));
         }
         bytesEncoded.writeTo(new FileOutputStream(outputPath));
+        */
+        
+        
         //BitSet bits = BitSet.valueOf(imageBytes);
         //System.out.println(bits.toString());
        
@@ -155,6 +186,11 @@ public class ImageCompressor {
         
         char currentlyDecoding = '0';
         int runLength = 0;
+        System.out.println("BIT LENGTH: "+compressedBits.length());
+        String compressedBitString = compressedBits.getBitString().toString();
+        System.out.println("CompressedBitStringLength: "+compressedBitString.length());
+        System.out.println("CompressedBitstring: "+compressedBitString.substring(0, 64));//DEBUG
+        /*
         while(compressedBits.getCounter()+encodedBitSize < compressedBits.length()){
             runLength = compressedBits.popInt(encodedBitSize);
             for(int i=0; i <runLength; i++)
@@ -169,16 +205,31 @@ public class ImageCompressor {
             else
                 currentlyDecoding='0';
         }
-        System.out.println(uncompressedBits.getBitString().toString());//DEBUG
-        for(int i=0;i<wrDest.getWidth();i++){
+        */
+        for(int i=0;i<compressedBitString.length();i+=encodedBitSize){
+            runLength = Integer.parseInt(compressedBitString.substring(i,i+encodedBitSize),2);
+            for(int j=0; j<runLength;j++){
+                if(currentlyDecoding=='0')
+                    uncompressedBits.addZero();
+                else
+                    uncompressedBits.addOne();
+            }
+            currentlyDecoding = swapCurrentlyEncoding(currentlyDecoding);
+        }
+        //FOR SOME REASON THAT I DON'T UNDERSTAND, WE LOSE A SINGLE BIT HERE (WE ARE ONE BIT SHORT)... Add in a random 0.
+        uncompressedBits.addZero();
+        
+        
+        System.out.println("UncompressedBitstringDecode: "+uncompressedBits.getBitString().toString().substring(0,64));//DEBUG
+        System.out.println("UncompressedBitstringDecodeLength: "+uncompressedBits.getBitString().toString().length());
+        
+        for(int i=0;i<wrDest.getWidth();i++){ //
             for(int j=0;j<wrDest.getHeight();j++){
                 wrDest.setSample(i, j, 0, uncompressedBits.popInt(8));
             }
         }
         dest.setData(wrDest);
         ImageIO.write(dest, getExtension(outputPath), new File(outputPath));
-
-        
     }
     public static void runLengthBitPlaneEncode(String inputPath, String outputPath) throws Exception
     {
