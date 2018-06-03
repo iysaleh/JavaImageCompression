@@ -43,6 +43,8 @@ public class VerboseBitSet {
     }
     public void addInt(int i,int numBits)
     {
+        if(numBits==16)
+            bitString.append(String.format("%016d", Integer.valueOf(Integer.toBinaryString(i))));
         if(numBits==8)
             bitString.append(String.format("%08d", Integer.valueOf(Integer.toBinaryString(i))));
         else if(numBits==4)
@@ -52,16 +54,25 @@ public class VerboseBitSet {
     }
     public void addOne(){this.bitString.append('1');}
     public void addZero(){this.bitString.append('0');}
+    public void addChar(char x){this.bitString.append(x);}
     public int popInt(int numBits)
     {
         //System.out.println("COUNTER:"+counter);
         String subBits = this.bitString.substring(counter,counter+numBits);
         this.counter += numBits;
-        //this.bitString.delete(0, numBits);
         return Integer.parseInt(subBits, 2);
+    }
+    public void padZeros() //For byte sized bitstrings
+    {
+        //Pad the bitstring with 0s if not byte-sized! (divisible by 8)
+        if(this.bitString.length()%8>0){
+            for(int i=0; i<this.bitString.length()%8;i++)
+                this.bitString.append('0');
+        }
     }
     public ByteArrayOutputStream getByteArray()
     {
+        this.padZeros();//Force bitstream to be byte sized!
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         for(int i=0;i<this.bitString.length();i+=8){
             bytes.write((byte)Integer.parseInt(this.bitString.substring(i,i+8),2));//Parse each byte from the bitstring
