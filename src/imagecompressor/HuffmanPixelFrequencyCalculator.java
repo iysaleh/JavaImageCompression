@@ -11,8 +11,8 @@ package imagecompressor;
  */
 public class HuffmanPixelFrequencyCalculator {
     
-    private int[] frequencyArray;
-    private int[] intVals;
+    public int[] frequencyArray;
+    public int[] intVals;
     public HuffmanPixelFrequencyCalculator(){
         frequencyArray = new int[256];//0-255 possible pixel values
         intVals = new int[256];//0-255 possible pixel values

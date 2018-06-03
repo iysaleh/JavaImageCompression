@@ -27,6 +27,7 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Scanner;
 import java.util.StringTokenizer;
 
 
@@ -50,8 +51,6 @@ public class ImageCompressor {
         
         WritableRaster wrSrc = src.getRaster();
         WritableRaster wrDestGray = destGray.getRaster();
-
-        System.out.println("FIRST 3 ENC IM VALS: "+ wrSrc.getSample(0, 0, 0) +"," +wrSrc.getSample(0, 1, 0) + ","+wrSrc.getSample(0, 2, 0));
         
         //Copy each sample from the original image into the grayscale domain BufferedImage.
         for(int i=0;i<wrSrc.getWidth();i++){
@@ -368,25 +367,78 @@ public class ImageCompressor {
         dest.setData(wrDest);
         ImageIO.write(dest, getExtension(outputPath), new File(outputPath));
     }
+    public static void writeHuffmanCodesToFile(String outputPath,String[] codes, int imWidth,int imHeight) throws Exception
+    {
+        //dictionary filename is filename.dict;
+        String dictionaryOutputPath = outputPath+".dict";
+        PrintStream ps = new PrintStream(new FileOutputStream(new File(dictionaryOutputPath)));
+        //We are putting the image width and height into the dictionary file
+        ps.println(imWidth+"");
+        ps.println(imHeight+"");
+        for(int i=0;i<codes.length;i++){
+            ps.println(codes[i]);
+        }
+        ps.flush();
+        ps.close();
+    }
+    public static Object[] loadHuffmanCodesFromFile(String outputPath) throws Exception
+    {//Object array because I want to include the image dimensions as well.
+        String[] huffmanCodes = new String[256];//0-255 pixel values
+        int imWidth=-1;
+        int imHeight=-1;
+        
+        String dictionaryPath = outputPath+".dict";
+        Scanner dictFileScanner = new Scanner(new File(dictionaryPath));
+        imWidth=Integer.parseInt(dictFileScanner.nextLine());
+        imHeight=Integer.parseInt(dictFileScanner.nextLine());
+        for(int i=0;i<huffmanCodes.length;i++){
+            huffmanCodes[i]=dictFileScanner.nextLine();
+        }
+        Object[] returnObj = new Object[3];
+        returnObj[0]=imWidth;
+        returnObj[1]=imHeight;
+        returnObj[2]=huffmanCodes;
+        return returnObj;
+    }
     public static void huffmanEncode(String inputPath, String outputPath) throws Exception
     {
         BufferedImage srcImg = loadGrayscaleImage(new File(inputPath));
         WritableRaster wrSrc = srcImg.getRaster();
         
-        HuffmanPixelFrequencyCalculator huffPix = new HuffmanPixelFrequencyCalculator();
+        HuffmanPixelFrequencyCalculator huffmanPix = new HuffmanPixelFrequencyCalculator();
         
         for(int i=0;i<wrSrc.getWidth();i++){
             for(int j=0;j<wrSrc.getHeight();j++){
-                huffPix.addIntElement(wrSrc.getSample(i, j, 0));
+                huffmanPix.addIntElement(wrSrc.getSample(i, j, 0));
             }
         }
         
+        HuffmanTree huffmanTree = HuffmanTree.makeHuffmanTree(huffmanPix.frequencyArray, huffmanPix.intVals);
+        String[] huffmanCodes = huffmanTree.generateHuffmanCodes();
+ 
+        //write the huffman code dictionary to a file including the image dimensions
+        writeHuffmanCodesToFile(outputPath,huffmanCodes,srcImg.getWidth(),srcImg.getHeight());        
         
-        
-        
+        VerboseBitSet huffmanEncodedBits = new VerboseBitSet();
+        for(int i=0;i<wrSrc.getWidth();i++){
+            for(int j=0;j<wrSrc.getHeight();j++){
+                huffmanEncodedBits.addString(huffmanCodes[wrSrc.getSample(i, j, 0)]);
+            }
+        }
+        //Write the encoded bits to a file.
+        huffmanEncodedBits.getByteArray().writeTo(new FileOutputStream(outputPath));
     }
     public static void huffmanDecode(String inputPath, String outputPath) throws Exception
     {
+        Object[] dictionaryLoad = loadHuffmanCodesFromFile(inputPath);
+        int imWidth = (int)dictionaryLoad[0];
+        int imHeight = (int)dictionaryLoad[1];
+        String[] huffmanCodes = (String[])dictionaryLoad[2];
+        
+        byte[] inputByteArray = Files.readAllBytes(Paths.get(inputPath));
+        VerboseBitSet compressedBits = new VerboseBitSet(inputByteArray);
+        
+        
     }
     public static void lzwEncode(String inputPath, String outputPath) throws Exception
     {
@@ -408,34 +460,43 @@ public class ImageCompressor {
         args = new String[] {"-input","lenaRLGCompressed.gif","-output","lenaRLGUncompressed.gif","-compressionType","runLengthGray","-encodingBitSize","4","-decode"};
         args = new String[] {"-input","lena.gif","-output","lenaRLGBitplaneCompressed.gif","-compressionType","runLengthBitPlane","-encodingBitSize","4"};
         args = new String[] {"-input","lenaRLGBitplaneCompressed.gif","-output","lenaRLGBitplaneUncompressed.gif","-compressionType","runLengthBitPlane","-encodingBitSize","4","-decode"};
-
+        args = new String[] {"-input","lena.gif","-output","lenaHuffmanCompressed.gif","-compressionType","huffman"};
+        //args = new String[] {"-input","lenaHuffmanCompressed.gif","-output","lenaHuffmanUncompressed.gif","-compressionType","huffman","-decode"};
+        
         //Create argument parser for command line arguments
         ArgParser parser = new ArgParser("Java ImageCompressor CLI Application");
         parser.addOption("-input %s #Relative path to input file to be processed", input);
         parser.addOption("-output %s #Relative path to output file to be written", output);
         parser.addOption("-encodingBitSize %s #Amount of bits to use for each encoded value--Use same bit size for compression & decompression!!!!", encodingBitSize);
-        parser.addOption("-compressionType %s #Compression type to utilize for encoding/decoding (runLengthGray,runLengthBitPlane,huffman,lzw)", compressionType);
+        parser.addOption("-compressionType %s #Compression type to utilize for encoding/decoding (runLengthGray,runLengthBitPlane,huffman)", compressionType);
         parser.addOption("-decode %v #If specified, decode action will be performed. Otherwise the program will encode the source input.", decode);
         parser.matchAllArgs (args);
         
+        
+        int encodingBitSizeInt = -1;
         //Catch null required commandline arguments and exit program
         try{
-            if(input.value.equals("null") || output.value.equals("null") || compressionType.value.equals("null") || encodingBitSize.value.equals("null")){
+            if(input.value.equals("null") || output.value.equals("null") || compressionType.value.equals("null")){
                 //NullPointerException will happen if command line args not input, go to catch.
             }
+            if(compressionType.value.equals("runLengthBitPlane")||compressionType.value.equals("runLengthGray")){
+                if(encodingBitSize.value.equals("null")){
+                    encodingBitSizeInt = Integer.parseInt(encodingBitSize.value);
+                    if(!(encodingBitSizeInt!=2 || encodingBitSizeInt!=4 || encodingBitSizeInt!=8 || encodingBitSizeInt!=16)){
+                        System.out.println("Encoding Bit Size (the number of bits used per each compressed run-length value) must be 2,4,8 or 16.");
+                        System.out.println("Be sure to use the same value for compression && decompression!");
+                        System.exit(1);
+                    }
+                }
+            }
         }
+        
         catch(NullPointerException e){
             System.out.println("You must specify the input, output and compressionType arguments!");
             System.out.println("Run -help for argument usage printout.");
             System.exit(1);            
         }
         
-        int encodingBitSizeInt = Integer.parseInt(encodingBitSize.value);
-        if(!(encodingBitSizeInt!=2 || encodingBitSizeInt!=4 || encodingBitSizeInt!=8 || encodingBitSizeInt!=16)){
-            System.out.println("Encoding Bit Size (the number of bits used per each compressed run-length value) must be 2,4,8 or 16.");
-            System.out.println("Be sure to use the same value for compression && decompression!");
-            System.exit(1);
-        }
         
         //System.out.println(String.format("%08d", Integer.valueOf(Integer.toBinaryString(0))));
         

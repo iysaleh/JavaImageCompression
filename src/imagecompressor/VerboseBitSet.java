@@ -52,6 +52,7 @@ public class VerboseBitSet {
         else if(numBits==2)
             bitString.append(String.format("%04d", Integer.valueOf(Integer.toBinaryString(i))));
     }
+    public void addString(String str) {this.bitString.append(str);}
     public void addOne(){this.bitString.append('1');}
     public void addZero(){this.bitString.append('0');}
     public void addChar(char x){this.bitString.append(x);}
