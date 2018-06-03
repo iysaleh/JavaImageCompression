@@ -439,6 +439,7 @@ public class ImageCompressor {
         VerboseBitSet compressedBits = new VerboseBitSet(inputByteArray);
         
         
+        
     }
     public static void lzwEncode(String inputPath, String outputPath) throws Exception
     {
@@ -461,7 +462,7 @@ public class ImageCompressor {
         args = new String[] {"-input","lena.gif","-output","lenaRLGBitplaneCompressed.gif","-compressionType","runLengthBitPlane","-encodingBitSize","4"};
         args = new String[] {"-input","lenaRLGBitplaneCompressed.gif","-output","lenaRLGBitplaneUncompressed.gif","-compressionType","runLengthBitPlane","-encodingBitSize","4","-decode"};
         args = new String[] {"-input","lena.gif","-output","lenaHuffmanCompressed.gif","-compressionType","huffman"};
-        //args = new String[] {"-input","lenaHuffmanCompressed.gif","-output","lenaHuffmanUncompressed.gif","-compressionType","huffman","-decode"};
+        args = new String[] {"-input","lenaHuffmanCompressed.gif","-output","lenaHuffmanUncompressed.gif","-compressionType","huffman","-decode"};
         
         //Create argument parser for command line arguments
         ArgParser parser = new ArgParser("Java ImageCompressor CLI Application");
