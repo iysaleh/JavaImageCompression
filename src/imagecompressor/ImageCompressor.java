@@ -82,10 +82,6 @@ public class ImageCompressor {
         ImageIO.write(img, srcFormat, baos);
         return baos.toByteArray();
     }
-    public static void addIntToBitSet(BitSet bits,int val)
-    {
-        //BitSet valBits = BitSet.valueOf()
-    }
  
     public static void runLengthGrayEncode(String inputPath, String outputPath,int encodedBitSize) throws Exception
     {
@@ -374,6 +370,20 @@ public class ImageCompressor {
     }
     public static void huffmanEncode(String inputPath, String outputPath) throws Exception
     {
+        BufferedImage srcImg = loadGrayscaleImage(new File(inputPath));
+        WritableRaster wrSrc = srcImg.getRaster();
+        
+        HuffmanPixelFrequencyCalculator huffPix = new HuffmanPixelFrequencyCalculator();
+        
+        for(int i=0;i<wrSrc.getWidth();i++){
+            for(int j=0;j<wrSrc.getHeight();j++){
+                huffPix.addIntElement(wrSrc.getSample(i, j, 0));
+            }
+        }
+        
+        
+        
+        
     }
     public static void huffmanDecode(String inputPath, String outputPath) throws Exception
     {
